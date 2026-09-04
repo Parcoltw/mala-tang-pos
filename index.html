@@ -49,14 +49,23 @@ dialog::backdrop{background:#0008}
 .modal .actions{display:flex;justify-content:flex-end;gap:8px;margin-top:16px}
 .small{font-size:13px;color:#666}
 @media(max-width:820px){
-  .layout{grid-template-columns:1fr}
-  .right{position:relative;top:0;height:auto;border-left:0;border-top:2px solid #111}
-  .categories{top:58px}
+  html,body{overflow-x:hidden}
+  header{position:relative;top:auto}
+  .layout{display:block;min-height:0}
+  .left{padding:10px;overflow:visible}
+  .categories{position:relative;top:auto;margin:0 0 10px;padding:0 0 4px;background:#f4f4f4;z-index:1}
+  .toolbar{margin:0 0 10px}
+  .right{position:relative;top:auto;height:auto;border-left:0;border-top:2px solid #111}
   .grid{grid-template-columns:repeat(3,minmax(0,1fr))}
   .item{min-height:88px;padding:11px}
   .item .name{font-size:15px}.item .price{font-size:17px}
 }
-@media(max-width:500px){.grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:500px){
+  header{padding-top:max(12px,env(safe-area-inset-top));}
+  .grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .categories button{padding:9px 13px}
+  .toolbar button{font-size:14px;padding:8px 10px}
+}
 </style>
 </head>
 <body>
