@@ -1,93 +1,67 @@
 (()=>{
 const STORE_NAME='辣極麻辣燙永和店';
 const QUICK_OPTIONS=['湯少','湯多','去油','盒裝湯裡','不要碗','不要餐具','麵分開','辣另包','水煮','自備碗','湯料分開','麵放一起','辣油各半'];
-const CONFLICTS={
-  '湯少':['湯多'],'湯多':['湯少'],
-  '麵分開':['麵放一起'],'麵放一起':['麵分開'],
-  '盒裝湯裡':['湯料分開'],'湯料分開':['盒裝湯裡'],
-  '辣另包':['辣油各半'],'辣油各半':['辣另包'],
-  '不要碗':['自備碗'],'自備碗':['不要碗']
-};
-const dayKey=(value)=>{const d=value instanceof Date?value:new Date(value);return [d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-')};
-const dayLabel=key=>key.replaceAll('-','/');
+const CONFLICTS={'湯少':['湯多'],'湯多':['湯少'],'麵分開':['麵放一起'],'麵放一起':['麵分開'],'盒裝湯裡':['湯料分開'],'湯料分開':['盒裝湯裡'],'辣另包':['辣油各半'],'辣油各半':['辣另包'],'不要碗':['自備碗'],'自備碗':['不要碗']};
+const dayKey=v=>{const d=v instanceof Date?v:new Date(v);return [d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-')};
 const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+document.title=STORE_NAME;const h=document.querySelector('header h1');if(h)h.textContent=STORE_NAME;
 
-document.title=STORE_NAME;
-const pageTitle=document.querySelector('header h1');if(pageTitle)pageTitle.textContent=STORE_NAME;
+const sty=document.createElement('style');sty.textContent=`
+.bowlTabs{display:flex;gap:7px;overflow-x:auto;padding:3px 0 10px}.bowlTabs button{white-space:nowrap;background:#fff;border:1px solid #bbb;border-radius:999px}.bowlTabs .active{background:#111;color:#fff}.bowlTools{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:10px}.bowlTools .add{background:#16803c;color:#fff}.bowlCard{border:1px solid #ddd;border-radius:12px;padding:10px;margin:8px 0}.bowlCard.active{border:2px solid #111}.bowlHead{display:flex;justify-content:space-between;font-weight:900}.bowlNote{font-size:13px;color:#555;margin:4px 0 7px}.optionGrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px}.optionGrid.spice{grid-template-columns:repeat(4,minmax(0,1fr))}.optionGrid label{position:relative;display:flex;align-items:center;justify-content:center;min-height:48px;border:1px solid #bbb;border-radius:10px;font-weight:900;text-align:center}.optionGrid label:has(input:checked){background:#111;color:#fff}.optionGrid input{position:absolute;opacity:0}#optionsDlg{width:min(96vw,700px)}@media(max-width:600px){.optionGrid,.optionGrid.spice{grid-template-columns:repeat(3,minmax(0,1fr))}}
+`;document.head.appendChild(sty);
 
-const style=document.createElement('style');
-style.textContent=`
-#optionsDlg{width:min(96vw,680px)}
-#optionsDlg .modal{padding:14px}
-.optionGrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
-.optionGrid.spiceGrid{grid-template-columns:repeat(4,minmax(0,1fr))}
-.optionGrid label{position:relative;display:flex;align-items:center;justify-content:center;text-align:center;min-height:52px;border:1.5px solid #bbb;border-radius:10px;background:#fff;font-weight:900;padding:8px;cursor:pointer;user-select:none}
-.optionGrid label:has(input:checked){background:#111;color:#fff;border-color:#111}
-.optionGrid input{position:absolute;opacity:0;pointer-events:none}
-@media(max-width:600px){#optionsDlg .modal{padding:11px}.optionGrid,.optionGrid.spiceGrid{grid-template-columns:repeat(3,minmax(0,1fr))}.optionGrid label{min-height:50px;padding:6px;font-size:14px}}
-`;
-document.head.appendChild(style);
+const left=document.querySelector('.left'),catsEl=document.getElementById('cats');
+const tabs=document.createElement('div');tabs.className='bowlTabs';tabs.id='bowlTabs';left.insertBefore(tabs,catsEl);
+const tools=document.createElement('div');tools.className='bowlTools';tools.innerHTML='<button id="addBowl" class="add">＋ 新增一碗</button><button id="editBowl" class="ghost">設定本碗選項</button><button id="removeBowl" class="ghost">刪除本碗</button>';left.insertBefore(tools,catsEl);
 
-function normalizeOrderNumbers(){const groups={};records.forEach(r=>{const k=dayKey(r.time);(groups[k]??=[]).push(r)});let changed=false;Object.values(groups).forEach(rs=>{rs.sort((a,b)=>new Date(a.time)-new Date(b.time));rs.forEach((r,i)=>{const no=i+1;if(Number(r.orderNo)!==no){r.orderNo=no;changed=true}})});if(changed)saveRecords()}
-function nextOrderNo(){normalizeOrderNumbers();const today=dayKey(new Date());return records.filter(r=>dayKey(r.time)===today).length+1}
-function currentLines(){return Object.entries(cart).filter(([,q])=>q>0).map(([i,q])=>({name:items[i][1],qty:Number(q),price:Number(items[i][2]),subtotal:Number(items[i][2])*Number(q)}))}
-function fallbackLines(r){if(Array.isArray(r.lines)&&r.lines.length)return r.lines;return String(r.items||'').split('、').filter(Boolean).map(x=>{const m=x.match(/^(.*)×(\d+)$/);return{name:m?m[1]:x,qty:m?Number(m[2]):1,subtotal:null}})}
-function recordExtras(r){if(Array.isArray(r.extras))return r.extras.filter(Boolean);const a=[];if(r.oil==='去油')a.push('去油');if(r.bowl==='不要碗')a.push('不要碗');if(r.utensils==='不要餐具')a.push('不要餐具');return a}
+function emptyBowl(){return{cart:{},service:'',spice:'',extras:[]}}
+let bowls=[emptyBowl()],current=0;
+function currentBowl(){return bowls[current]}
+function syncCart(){cart=currentBowl().cart}
+function count(b){return Object.values(b.cart).reduce((s,q)=>s+Number(q),0)}
+function bowlTotal(b){return Object.entries(b.cart).reduce((s,[i,q])=>s+Number(items[i][2])*Number(q),0)}
+function orderTotal(){return bowls.reduce((s,b)=>s+bowlTotal(b),0)}
+function filled(){return bowls.filter(b=>count(b)>0)}
+function note(b){const p=[b.spice,...(b.extras||[])].filter(Boolean);return p.length?'● '+p.join('、'):''}
+function bowlItemsText(b){return Object.entries(b.cart).filter(([,q])=>q>0).map(([i,q])=>`${items[i][1]}×${q}`).join('、')}
+function bowlLines(b){return Object.entries(b.cart).filter(([,q])=>q>0).map(([i,q])=>({name:items[i][1],qty:Number(q),price:Number(items[i][2]),subtotal:Number(items[i][2])*Number(q)}))}
 
-function printReceipt(r){
-  const no=String(r.orderNo||0).padStart(3,'0'),dt=new Date(r.time),date=dt.toLocaleDateString('zh-TW'),time=dt.toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit',hour12:false});
-  const itemRows=fallbackLines(r).map(x=>`<div class="item"><span>${esc(x.name)}</span><span class="qty">×${x.qty}</span><span class="money">${x.subtotal==null?'':'$'+x.subtotal}</span></div>`).join('');
-  const extras=recordExtras(r);
-  const compact=[r.spice,...extras].filter(Boolean).map(esc).join('、');
-  const noteLine=compact?`<div class="note">● ${compact}</div>`:'';
-  const paid=r.cash?`<div class="sumrow"><span>收現</span><b>$${r.cash}</b></div><div class="sumrow"><span>找零</span><b>$${r.change||0}</b></div>`:'';
-  const w=window.open('','_blank','width=420,height=760');if(!w){alert('請允許此網站開啟彈出式視窗，才能列印出單。');return}
-  w.document.write(`<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${STORE_NAME} #${no}</title><style>@page{size:80mm auto;margin:2.5mm}*{box-sizing:border-box}html,body{margin:0;padding:0;background:#fff;color:#000;font-family:-apple-system,BlinkMacSystemFont,"Noto Sans TC",sans-serif}.r{width:75mm;margin:0 auto;font-size:14px;line-height:1.35}.shop{text-align:center;font-size:23px;font-weight:900}.service{text-align:center;font-size:22px;font-weight:900;border:2px solid #000;padding:2mm;margin:2mm 0}.no{text-align:center;font-size:40px;font-weight:950;letter-spacing:2px}.dt{display:flex;justify-content:space-between;font-size:12px;margin:2mm 0}.dash{border-top:1px dashed #000;margin:2mm 0}.head,.item{display:grid;grid-template-columns:1fr 11mm 17mm;gap:1mm}.head{font-weight:900;font-size:12px}.item{padding:1.4mm 0;border-bottom:1px dotted #bbb}.qty{text-align:center}.money{text-align:right;font-weight:800}.note{font-size:14px;font-weight:850;padding:1.4mm 0;white-space:normal;word-break:break-word}.sumrow,.grand{display:flex;justify-content:space-between}.sumrow{font-size:16px;padding:.8mm 0}.grand{font-size:25px;font-weight:950}.foot{text-align:center;font-size:11px;margin-top:4mm}</style></head><body><div class="r"><div class="shop">${STORE_NAME}</div><div class="service">${esc(r.service||'訂單')}</div><div class="no">${no}</div><div class="dt"><span>${date}</span><span>${time}</span></div><div class="dash"></div><div class="head"><span>品項</span><span style="text-align:center">數量</span><span style="text-align:right">小計</span></div>${itemRows}${noteLine}<div class="dash"></div><div class="grand"><span>總計</span><span>$${Number(r.amount||0)}</span></div>${paid}<div class="foot">請依單號取餐・謝謝光臨</div></div><script>window.onload=()=>setTimeout(()=>window.print(),250)<\/script></body></html>`);w.document.close();
-}
-window.printReceipt=printReceipt;normalizeOrderNumbers();
+function renderTabs(){tabs.innerHTML='';bowls.forEach((b,i)=>{const x=document.createElement('button');x.className=i===current?'active':'';x.textContent=`第 ${i+1} 碗${count(b)?' ('+count(b)+')':''}`;x.onclick=()=>{current=i;syncCart();renderTabs();renderCart()};tabs.appendChild(x)});document.getElementById('removeBowl').disabled=bowls.length<=1}
 
-let checkoutIntent=false;
-const optionsDlg=document.getElementById('optionsDlg');
-optionsDlg.innerHTML=`<div class="modal"><h2 id="optionsTitle">結帳選項</h2>
-<div class="section"><div class="sectionTitle">用餐方式</div><div class="optionGrid"><label><input type="radio" name="service2" value="內用">內用</label><label><input type="radio" name="service2" value="外帶">外帶</label></div></div>
-<div class="section"><div class="sectionTitle">辣度</div><div class="optionGrid spiceGrid" id="spiceChoices2"></div></div>
-<div class="section"><div class="sectionTitle">其他需求（可複選）</div><div class="optionGrid" id="quickChoices"></div></div>
-<div class="modalFoot"><button id="optionsCancel2" class="ghost">取消</button><button id="optionsSave2" class="dark">確認</button></div></div>`;
-const spiceBox=document.getElementById('spiceChoices2');
-SPICES.forEach(s=>{const l=document.createElement('label');l.innerHTML=`<input type="radio" name="spice2" value="${s}">${s}`;spiceBox.appendChild(l)});
-const quickBox=document.getElementById('quickChoices');
-QUICK_OPTIONS.forEach(v=>{const l=document.createElement('label');l.innerHTML=`<input type="checkbox" name="quick2" value="${v}">${v}`;quickBox.appendChild(l)});
-quickBox.addEventListener('change',e=>{const t=e.target;if(!t.matches('input[type="checkbox"]')||!t.checked)return;(CONFLICTS[t.value]||[]).forEach(v=>{const q=quickBox.querySelector(`input[value="${v}"]`);if(q)q.checked=false})});
-function pick(name){const e=document.querySelector(`input[name="${name}"]:checked`);return e?e.value:null}
-function quickSelected(){return [...document.querySelectorAll('input[name="quick2"]:checked')].map(x=>x.value)}
-function renderMetaNew(){if(!pendingOptions){document.getElementById('orderMeta').textContent='尚未設定內用/外帶與辣度';return}const parts=[pendingOptions.service,pendingOptions.spice,...(pendingOptions.extras||[])];document.getElementById('orderMeta').textContent=parts.filter(Boolean).join('・')}
-window.renderMeta=renderMetaNew;
-function openOptionsNew(){
-  document.querySelectorAll('input[name="service2"],input[name="spice2"],input[name="quick2"]').forEach(x=>x.checked=false);
-  if(pendingOptions){const s=document.querySelector(`input[name="service2"][value="${pendingOptions.service}"]`);const p=document.querySelector(`input[name="spice2"][value="${pendingOptions.spice}"]`);if(s)s.checked=true;if(p)p.checked=true;(pendingOptions.extras||[]).forEach(v=>{const e=quickBox.querySelector(`input[value="${v}"]`);if(e)e.checked=true})}
-  document.getElementById('optionsSave2').textContent=checkoutIntent?'確認並結帳':'儲存選項';
-  optionsDlg.showModal();
-}
-window.openOptions=openOptionsNew;
+const oldRenderGrid=renderGrid;
+renderGrid=function(){oldRenderGrid();document.querySelectorAll('#grid .item').forEach((b,visibleIndex)=>{const visible=items.map((it,i)=>({it,i})).filter(x=>active==='全部'||x.it[0]===active);const idx=visible[visibleIndex]?.i;if(idx==null)return;b.onclick=()=>{currentBowl().cart[idx]=(currentBowl().cart[idx]||0)+1;syncCart();renderTabs();renderCart()}})};
 
-function finishCheckout(){
-  if(!Object.keys(cart).length){alert('目前沒有商品');return false}
-  const c=Number(cash.value||0),t=total();if(c&&c<t){alert('收款金額不足');return false}if(!pendingOptions)return false;
-  const no=nextOrderNo(),extras=pendingOptions.extras||[];
-  const rec={id:Date.now(),orderNo:no,time:new Date().toISOString(),amount:t,service:pendingOptions.service,spice:pendingOptions.spice,extras,oil:extras.includes('去油')?'去油':'',bowl:extras.includes('不要碗')?'不要碗':'',utensils:extras.includes('不要餐具')?'不要餐具':'',items:cartText(),lines:currentLines(),cash:c||0,change:c?c-t:0};
-  records.unshift(rec);saveRecords();printReceipt(rec);cart={};cash.value='';pendingOptions=null;renderCart();return true
-}
+total=function(){return orderTotal()};
+cartText=function(){return filled().map((b,i)=>`第${i+1}碗：${bowlItemsText(b)}`).join('｜')};
+calcChange=function(){const t=orderTotal(),c=Number(cash.value||0);document.getElementById('change').textContent=c>=t?`找零：$${c-t}`:`尚差：$${t-c}`};
+renderMeta=function(){const fs=filled();document.getElementById('orderMeta').innerHTML=fs.length?fs.map((b,i)=>esc(`第${i+1}碗・${b.service||'未選內外帶'}・${b.spice||'未選辣度'}${b.extras?.length?'・'+b.extras.join('・'):''}`)).join('<br>'):'可先點第一碗食材 → 設定辣度/需求 → 再新增下一碗'};
+renderCart=function(){syncCart();const box=document.getElementById('cart');box.innerHTML='';const fs=filled();if(!fs.length)box.innerHTML='<div class="empty">點商品加入目前這一碗</div>';fs.forEach((b,displayIdx)=>{const real=bowls.indexOf(b),d=document.createElement('div');d.className='bowlCard'+(real===current?' active':'');d.innerHTML=`<div class="bowlHead"><span>第 ${displayIdx+1} 碗${real===current?'（目前）':''}</span><span>$${bowlTotal(b)}</span></div><div class="bowlNote">${esc((b.service||'未選內外帶')+'・'+(b.spice||'未選辣度'))}${note(b)?'<br>'+esc(note(b)):''}</div>`;d.onclick=()=>{current=real;syncCart();renderTabs();renderCart()};Object.entries(b.cart).forEach(([i,q])=>{const r=document.createElement('div');r.className='row';r.innerHTML=`<div><div class="rowName">${esc(items[i][1])}　$${items[i][2]}</div><div class="qty"><button data-m>−</button><b>${q}</b><button data-p>＋</button></div></div><div class="sum">$${items[i][2]*q}</div>`;r.querySelector('[data-m]').onclick=e=>{e.stopPropagation();b.cart[i]--;if(b.cart[i]<=0)delete b.cart[i];syncCart();renderTabs();renderCart()};r.querySelector('[data-p]').onclick=e=>{e.stopPropagation();b.cart[i]++;syncCart();renderTabs();renderCart()};d.appendChild(r)});box.appendChild(d)});document.getElementById('total').textContent='$'+orderTotal();calcChange();renderMeta()};
 
-const checkout=document.getElementById('checkout');
-checkout.onclick=()=>{if(!Object.keys(cart).length){alert('目前沒有商品');return}const c=Number(cash.value||0);if(c&&c<total()){alert('收款金額不足');return}if(!pendingOptions){checkoutIntent=true;openOptionsNew();return}checkoutIntent=false;finishCheckout()};
-const orderMeta=document.getElementById('orderMeta');if(orderMeta)orderMeta.onclick=()=>{checkoutIntent=false;openOptionsNew()};
-document.getElementById('optionsCancel2').onclick=()=>{checkoutIntent=false;optionsDlg.close()};
-document.getElementById('optionsSave2').onclick=()=>{const service=pick('service2'),spice=pick('spice2');if(!service||!spice){alert('請選擇內用/外帶與辣度');return}pendingOptions={service,spice,extras:quickSelected()};renderMetaNew();optionsDlg.close();if(checkoutIntent){checkoutIntent=false;finishCheckout()}};
+const dlg=document.getElementById('optionsDlg');dlg.innerHTML=`<div class="modal"><h2 id="optionsTitle">本碗選項</h2><div class="section"><div class="sectionTitle">用餐方式</div><div class="optionGrid"><label><input type="radio" name="svc2" value="內用">內用</label><label><input type="radio" name="svc2" value="外帶">外帶</label></div></div><div class="section"><div class="sectionTitle">辣度</div><div class="optionGrid spice" id="spice2"></div></div><div class="section"><div class="sectionTitle">其他需求（可複選）</div><div class="optionGrid" id="quick2"></div></div><div class="modalFoot"><button id="optCancel2" class="ghost">取消</button><button id="optSave2" class="dark">儲存本碗</button></div></div>`;
+SPICES.forEach(s=>{const l=document.createElement('label');l.innerHTML=`<input type="radio" name="sp2" value="${s}">${s}`;document.getElementById('spice2').appendChild(l)});
+QUICK_OPTIONS.forEach(v=>{const l=document.createElement('label');l.innerHTML=`<input type="checkbox" name="q2" value="${v}">${v}`;document.getElementById('quick2').appendChild(l)});
+document.getElementById('quick2').addEventListener('change',e=>{const t=e.target;if(!t.checked)return;(CONFLICTS[t.value]||[]).forEach(v=>{const q=document.querySelector(`input[name="q2"][value="${v}"]`);if(q)q.checked=false})});
+function pick(n){const e=document.querySelector(`input[name="${n}"]:checked`);return e?e.value:''}
+function picks(n){return [...document.querySelectorAll(`input[name="${n}"]:checked`)].map(x=>x.value)}
+function openBowlOptions(){const b=currentBowl();document.querySelectorAll('input[name="svc2"],input[name="sp2"],input[name="q2"]').forEach(x=>x.checked=false);if(b.service){const e=document.querySelector(`input[name="svc2"][value="${b.service}"]`);if(e)e.checked=true}if(b.spice){const e=document.querySelector(`input[name="sp2"][value="${b.spice}"]`);if(e)e.checked=true}(b.extras||[]).forEach(v=>{const e=document.querySelector(`input[name="q2"][value="${v}"]`);if(e)e.checked=true});document.getElementById('optionsTitle').textContent=`第 ${current+1} 碗選項`;dlg.showModal()}
+function saveBowlOptions(){const svc=pick('svc2'),sp=pick('sp2');if(!svc||!sp){alert('請選擇內用/外帶與辣度');return false}const b=currentBowl();b.service=svc;b.spice=sp;b.extras=picks('q2');dlg.close();renderCart();return true}
+document.getElementById('optCancel2').onclick=()=>dlg.close();document.getElementById('optSave2').onclick=saveBowlOptions;
+window.openOptions=openBowlOptions;
+document.getElementById('orderMeta').onclick=openBowlOptions;
+document.getElementById('editBowl').onclick=()=>{if(!count(currentBowl())){alert('這一碗還沒有商品');return}openBowlOptions()};
+document.getElementById('addBowl').onclick=()=>{if(!count(currentBowl())){alert('請先點目前這一碗的食材');return}if(!currentBowl().spice||!currentBowl().service){alert('請先設定目前這一碗的內用/外帶與辣度');openBowlOptions();return}bowls.push(emptyBowl());current=bowls.length-1;syncCart();renderTabs();renderCart()};
+document.getElementById('removeBowl').onclick=()=>{if(bowls.length<=1)return;if(confirm(`刪除第 ${current+1} 碗？`)){bowls.splice(current,1);current=Math.min(current,bowls.length-1);syncCart();renderTabs();renderCart()}};
+document.getElementById('clear').onclick=()=>{if(confirm('清空整張訂單？')){bowls=[emptyBowl()];current=0;syncCart();cash.value='';renderTabs();renderCart()}};
 
-window.renderHistory=()=>{
-  normalizeOrderNumbers();document.getElementById('statCount').textContent=records.length;document.getElementById('statRevenue').textContent='$'+records.reduce((s,r)=>s+Number(r.amount||0),0);const list=document.getElementById('historyList');list.innerHTML='';if(!records.length){list.innerHTML='<div class="empty">尚無結帳紀錄</div>';return}
-  const groups={};records.forEach(r=>{const k=dayKey(r.time);(groups[k]??=[]).push(r)});Object.keys(groups).sort().reverse().forEach(k=>{const rs=groups[k].sort((a,b)=>new Date(b.time)-new Date(a.time)),dailyTotal=rs.reduce((s,r)=>s+Number(r.amount||0),0),section=document.createElement('section');section.style.cssText='margin:14px 0 18px';section.innerHTML=`<div style="display:flex;justify-content:space-between;align-items:end;border-bottom:2px solid #111;padding:7px 2px;font-weight:900"><span>${dayLabel(k)}</span><span>${rs.length} 筆・$${dailyTotal}</span></div>`;
-    rs.forEach(r=>{const extras=recordExtras(r);const d=document.createElement('div');d.className='record';d.innerHTML=`<div class="recordHead"><span>#${String(r.orderNo||0).padStart(3,'0')}　${esc(r.service)}・${esc(r.spice)}</span><span>$${r.amount}</span></div><div class="recordMeta">${localTime(r.time)}${extras.length?'・'+extras.map(esc).join('・'):''}</div><div class="recordItems">${esc(r.items||'')}</div><div class="recordBtns"><button class="dark" data-print>重印</button><button class="ghost" data-edit>修改</button><button class="ghost" data-del>刪除</button></div>`;d.querySelector('[data-print]').onclick=()=>printReceipt(r);d.querySelector('[data-edit]').onclick=()=>openEdit(r.id);d.querySelector('[data-del]').onclick=()=>{if(confirm('確定刪除這筆結帳紀錄？')){records=records.filter(x=>x.id!==r.id);normalizeOrderNumbers();saveRecords();renderHistory()}};section.appendChild(d)});list.appendChild(section)})
-};
+function normalizeOrderNumbers(){const g={};records.forEach(r=>{const k=dayKey(r.time);(g[k]??=[]).push(r)});let changed=false;Object.values(g).forEach(rs=>{rs.sort((a,b)=>new Date(a.time)-new Date(b.time));rs.forEach((r,i)=>{if(Number(r.orderNo)!==i+1){r.orderNo=i+1;changed=true}})});if(changed)saveRecords()}
+function nextOrderNo(){normalizeOrderNumbers();const k=dayKey(new Date());return records.filter(r=>dayKey(r.time)===k).length+1}
+function printReceipt(r){const no=String(r.orderNo||0).padStart(3,'0'),dt=new Date(r.time),date=dt.toLocaleDateString('zh-TW'),time=dt.toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit',hour12:false});const groups=(r.bowls||[]).map(b=>{const rows=(b.lines||[]).map(x=>`<div class="item"><span>${esc(x.name)}</span><span class="qty">${x.qty}</span><span class="money">${x.subtotal}</span></div>`).join('');const n=[b.spice,...(b.extras||[])].filter(Boolean).join('、');return `<div>${rows}${n?`<div class="note">● ${esc(n)}</div>`:''}</div>`}).join('<div class="sep"></div>');const label=(r.bowls||[]).length>1?'併單':(r.bowls?.[0]?.service||'訂單');const w=window.open('','_blank','width=430,height=820');if(!w){alert('請允許彈出式視窗才能列印');return}w.document.write(`<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8"><title>${STORE_NAME} ${no}</title><style>@page{size:80mm auto;margin:2.5mm}*{box-sizing:border-box}body{margin:0;color:#000;font-family:-apple-system,BlinkMacSystemFont,"Noto Sans TC",sans-serif}.r{width:75mm;margin:auto;font-size:14px}.shop{text-align:center;font-size:20px}.ord{font-size:25px;font-weight:900;margin:2mm 0}.dt{display:flex;justify-content:space-between;font-size:12px}.dash{border-top:1px dashed #000;margin:2mm 0}.head,.item{display:grid;grid-template-columns:1fr 9mm 16mm;gap:1mm}.head{font-weight:900}.item{padding:1mm 0}.qty{text-align:center}.money{text-align:right}.note{font-weight:800;padding:1mm 0 2mm}.sep{border-top:1px dotted #999;margin:1.5mm 0}.grand{display:grid;grid-template-columns:1fr 9mm 16mm;font-size:27px;font-weight:900}.foot{text-align:center;font-size:11px;margin-top:4mm}</style></head><body><div class="r"><div class="shop">${STORE_NAME}</div><div class="ord">${label}單號：${no}</div><div class="dt"><span>日期：${date}</span><span>時間：${time}</span></div><div style="font-size:12px">交易序號：${dayKey(r.time).replaceAll('-','')}${no}</div><div class="dash"></div><div class="head"><span>商品名稱</span><span>數量</span><span style="text-align:right">金額</span></div><div class="dash"></div>${groups}<div class="dash"></div><div class="grand"><span>總計：</span><span>${r.itemCount}</span><span style="text-align:right">${r.amount}元</span></div>${r.cash?`<div style="display:flex;justify-content:space-between"><span>現金付款：</span><span>${r.cash}.0</span></div>`:''}<div class="foot">請依單號取餐・謝謝光臨</div></div><script>window.onload=()=>setTimeout(()=>window.print(),250)<\/script></body></html>`);w.document.close()}
+window.printReceipt=printReceipt;
+function finishCheckout(){const fs=filled();if(!fs.length){alert('目前沒有商品');return}for(let i=0;i<fs.length;i++){if(!fs[i].service||!fs[i].spice){current=bowls.indexOf(fs[i]);syncCart();renderTabs();renderCart();alert(`第 ${i+1} 碗尚未設定內用/外帶與辣度`);openBowlOptions();return}}const t=orderTotal(),c=Number(cash.value||0);if(c&&c<t){alert('收款金額不足');return}const rec={id:Date.now(),orderNo:nextOrderNo(),time:new Date().toISOString(),amount:t,itemCount:fs.reduce((s,b)=>s+count(b),0),cash:c||0,change:c?c-t:0,bowls:fs.map(b=>({service:b.service,spice:b.spice,extras:[...(b.extras||[])],items:bowlItemsText(b),lines:bowlLines(b)}))};records.unshift(rec);saveRecords();printReceipt(rec);bowls=[emptyBowl()];current=0;syncCart();cash.value='';renderTabs();renderCart()}
+document.getElementById('checkout').onclick=finishCheckout;
+
+window.renderHistory=()=>{normalizeOrderNumbers();document.getElementById('statCount').textContent=records.length;document.getElementById('statRevenue').textContent='$'+records.reduce((s,r)=>s+Number(r.amount||0),0);const list=document.getElementById('historyList');list.innerHTML='';if(!records.length){list.innerHTML='<div class="empty">尚無結帳紀錄</div>';return}const g={};records.forEach(r=>{const k=dayKey(r.time);(g[k]??=[]).push(r)});Object.keys(g).sort().reverse().forEach(k=>{const rs=g[k].sort((a,b)=>new Date(b.time)-new Date(a.time)),section=document.createElement('section'),sum=rs.reduce((s,r)=>s+Number(r.amount||0),0);section.innerHTML=`<div style="display:flex;justify-content:space-between;border-bottom:2px solid #111;padding:7px 2px;font-weight:900"><span>${k.replaceAll('-','/')}</span><span>${rs.length} 筆・$${sum}</span></div>`;rs.forEach(r=>{const bs=Array.isArray(r.bowls)?r.bowls:[{service:r.service||'',spice:r.spice||'',extras:r.extras||[],items:r.items||'',lines:r.lines||[]}];const d=document.createElement('div');d.className='record';d.innerHTML=`<div class="recordHead"><span>#${String(r.orderNo||0).padStart(3,'0')}　${bs.length} 碗</span><span>$${r.amount}</span></div><div class="recordMeta">${new Date(r.time).toLocaleString('zh-TW',{hour12:false})}</div><div class="recordItems">${bs.map((b,i)=>esc(`第${i+1}碗：${b.items||''}\n● ${[b.service,b.spice,...(b.extras||[])].filter(Boolean).join('、')}`)).join('<br>')}</div><div class="recordBtns"><button class="dark" data-p>重印</button><button class="ghost" data-d>刪除</button></div>`;d.querySelector('[data-p]').onclick=()=>printReceipt({...r,bowls:bs,itemCount:r.itemCount||bs.reduce((s,b)=>s+(b.lines||[]).reduce((a,x)=>a+Number(x.qty||0),0),0)});d.querySelector('[data-d]').onclick=()=>{if(confirm('確定刪除這筆紀錄？')){records=records.filter(x=>x.id!==r.id);saveRecords();renderHistory()}};section.appendChild(d)});list.appendChild(section)})};
 document.getElementById('historyBtn').onclick=()=>{renderHistory();document.getElementById('historyDlg').showModal()};
+
+syncCart();renderGrid();renderTabs();renderCart();
 })();
