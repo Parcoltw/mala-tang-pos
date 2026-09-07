@@ -1,14 +1,25 @@
 (()=>{
+const STORE_NAME='辣極麻辣燙永和店';
 const dayKey=(value)=>{
   const d=value instanceof Date?value:new Date(value);
   return [d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-');
 };
 const dayLabel=(key)=>key.replaceAll('-','/');
-const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#39;'}[m]));
+const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+
+// 確保頁面與列印標題都是永和店。
+document.title=STORE_NAME;
+const pageTitle=document.querySelector('header h1');
+if(pageTitle)pageTitle.textContent=STORE_NAME;
 
 function normalizeOrderNumbers(){
-  const groups={};records.forEach(r=>{const k=dayKey(r.time);(groups[k]??=[]).push(r)});let changed=false;
-  Object.values(groups).forEach(rs=>{rs.sort((a,b)=>new Date(a.time)-new Date(b.time));rs.forEach((r,i)=>{const no=i+1;if(Number(r.orderNo)!==no){r.orderNo=no;changed=true}})});
+  const groups={};
+  records.forEach(r=>{const k=dayKey(r.time);(groups[k]??=[]).push(r)});
+  let changed=false;
+  Object.values(groups).forEach(rs=>{
+    rs.sort((a,b)=>new Date(a.time)-new Date(b.time));
+    rs.forEach((r,i)=>{const no=i+1;if(Number(r.orderNo)!==no){r.orderNo=no;changed=true}});
+  });
   if(changed)saveRecords();
 }
 function nextOrderNo(){normalizeOrderNumbers();const today=dayKey(new Date());return records.filter(r=>dayKey(r.time)===today).length+1}
@@ -21,15 +32,51 @@ function printReceipt(r){
   const opts=[['辣度',r.spice],r.oil?['去油',r.oil]:null,r.service==='外帶'&&r.bowl?['碗',r.bowl]:null,r.service==='外帶'&&r.utensils?['餐具',r.utensils]:null].filter(Boolean).map(([k,v])=>`<div class="opt"><span>${esc(k)}</span><b>${esc(v)}</b></div>`).join('');
   const paid=r.cash?`<div class="sumrow"><span>收現</span><b>$${r.cash}</b></div><div class="sumrow"><span>找零</span><b>$${r.change||0}</b></div>`:'';
   const w=window.open('','_blank','width=420,height=760');if(!w){alert('請允許此網站開啟彈出式視窗，才能列印出單。');return}
-  w.document.write(`<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>辣極麻辣燙 #${no}</title><style>@page{size:80mm auto;margin:2.5mm}*{box-sizing:border-box}html,body{margin:0;padding:0;background:#fff;color:#000;font-family:-apple-system,BlinkMacSystemFont,"Noto Sans TC",sans-serif}.r{width:75mm;margin:0 auto;font-size:14px;line-height:1.35}.shop{text-align:center;font-size:25px;font-weight:900}.service{text-align:center;font-size:22px;font-weight:900;border:2px solid #000;padding:2mm;margin:2mm 0}.no{text-align:center;font-size:40px;font-weight:950;letter-spacing:2px}.dt{display:flex;justify-content:space-between;font-size:12px;margin:2mm 0}.dash{border-top:1px dashed #000;margin:2mm 0}.head,.item{display:grid;grid-template-columns:1fr 11mm 17mm;gap:1mm}.head{font-weight:900;font-size:12px}.item{padding:1.4mm 0;border-bottom:1px dotted #bbb}.qty{text-align:center}.money{text-align:right;font-weight:800}.opt,.sumrow,.grand{display:flex;justify-content:space-between}.opt{font-size:16px;padding:1mm 0}.sumrow{font-size:16px;padding:.8mm 0}.grand{font-size:25px;font-weight:950}.foot{text-align:center;font-size:11px;margin-top:4mm}</style></head><body><div class="r"><div class="shop">辣極麻辣燙</div><div class="service">${esc(r.service||'訂單')}</div><div class="no">${no}</div><div class="dt"><span>${date}</span><span>${time}</span></div><div class="dash"></div><div class="head"><span>品項</span><span style="text-align:center">數量</span><span style="text-align:right">小計</span></div>${itemRows}<div class="dash"></div>${opts}<div class="dash"></div><div class="grand"><span>總計</span><span>$${Number(r.amount||0)}</span></div>${paid}<div class="foot">請依單號取餐・謝謝光臨</div></div><script>window.onload=()=>setTimeout(()=>window.print(),250)<\/script></body></html>`);w.document.close();
+  w.document.write(`<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${STORE_NAME} #${no}</title><style>@page{size:80mm auto;margin:2.5mm}*{box-sizing:border-box}html,body{margin:0;padding:0;background:#fff;color:#000;font-family:-apple-system,BlinkMacSystemFont,"Noto Sans TC",sans-serif}.r{width:75mm;margin:0 auto;font-size:14px;line-height:1.35}.shop{text-align:center;font-size:23px;font-weight:900}.service{text-align:center;font-size:22px;font-weight:900;border:2px solid #000;padding:2mm;margin:2mm 0}.no{text-align:center;font-size:40px;font-weight:950;letter-spacing:2px}.dt{display:flex;justify-content:space-between;font-size:12px;margin:2mm 0}.dash{border-top:1px dashed #000;margin:2mm 0}.head,.item{display:grid;grid-template-columns:1fr 11mm 17mm;gap:1mm}.head{font-weight:900;font-size:12px}.item{padding:1.4mm 0;border-bottom:1px dotted #bbb}.qty{text-align:center}.money{text-align:right;font-weight:800}.opt,.sumrow,.grand{display:flex;justify-content:space-between}.opt{font-size:16px;padding:1mm 0}.sumrow{font-size:16px;padding:.8mm 0}.grand{font-size:25px;font-weight:950}.foot{text-align:center;font-size:11px;margin-top:4mm}</style></head><body><div class="r"><div class="shop">${STORE_NAME}</div><div class="service">${esc(r.service||'訂單')}</div><div class="no">${no}</div><div class="dt"><span>${date}</span><span>${time}</span></div><div class="dash"></div><div class="head"><span>品項</span><span style="text-align:center">數量</span><span style="text-align:right">小計</span></div>${itemRows}<div class="dash"></div>${opts}<div class="dash"></div><div class="grand"><span>總計</span><span>$${Number(r.amount||0)}</span></div>${paid}<div class="foot">請依單號取餐・謝謝光臨</div></div><script>window.onload=()=>setTimeout(()=>window.print(),250)<\/script></body></html>`);w.document.close();
 }
-window.printReceipt=printReceipt;normalizeOrderNumbers();
+window.printReceipt=printReceipt;
+normalizeOrderNumbers();
 
+function finishCheckout(){
+  if(!Object.keys(cart).length){alert('目前沒有商品');return false}
+  const c=Number(cash.value||0),t=total();
+  if(c&&c<t){alert('收款金額不足');return false}
+  if(!pendingOptions)return false;
+  const no=nextOrderNo();
+  const rec={id:Date.now(),orderNo:no,time:new Date().toISOString(),amount:t,service:pendingOptions.service,spice:pendingOptions.spice,oil:pendingOptions.oil||'',bowl:pendingOptions.bowl||'',utensils:pendingOptions.utensils||'',items:cartText(),lines:currentLines(),cash:c||0,change:c?c-t:0};
+  records.unshift(rec);saveRecords();printReceipt(rec);
+  cart={};cash.value='';pendingOptions=null;renderCart();
+  return true;
+}
+
+let checkoutIntent=false;
 const checkout=document.getElementById('checkout');
 checkout.onclick=()=>{
-  if(!Object.keys(cart).length){alert('目前沒有商品');return}const c=Number(cash.value||0);if(c&&c<total()){alert('收款金額不足');return}if(!pendingOptions){openOptions();return}
-  const no=nextOrderNo(),t=total();const rec={id:Date.now(),orderNo:no,time:new Date().toISOString(),amount:t,service:pendingOptions.service,spice:pendingOptions.spice,oil:pendingOptions.oil||'',bowl:pendingOptions.bowl||'',utensils:pendingOptions.utensils||'',items:cartText(),lines:currentLines(),cash:c||0,change:c?c-t:0};records.unshift(rec);saveRecords();printReceipt(rec);cart={};cash.value='';pendingOptions=null;renderCart();
+  if(!Object.keys(cart).length){alert('目前沒有商品');return}
+  const c=Number(cash.value||0);if(c&&c<total()){alert('收款金額不足');return}
+  if(!pendingOptions){checkoutIntent=true;openOptions();return}
+  checkoutIntent=false;finishCheckout();
 };
+
+// 從訂單資訊列進去只是修改選項，不會自動結帳。
+const orderMeta=document.getElementById('orderMeta');
+if(orderMeta)orderMeta.onclick=()=>{checkoutIntent=false;openOptions()};
+
+// 從「結帳」進入選項時，按一次確認就直接完成結帳與出單。
+const optionsSave=document.getElementById('optionsSave');
+if(optionsSave){
+  optionsSave.textContent='確認並結帳';
+  optionsSave.onclick=()=>{
+    const service=selected('service'),spice=selected('spice');
+    if(!service||!spice){alert('請選擇內用/外帶與辣度');return}
+    const oil=SPICES.indexOf(spice)>=3?selected('oil'):null;
+    pendingOptions={service,spice,oil,bowl:service==='外帶'?selected('bowl'):null,utensils:service==='外帶'?selected('utensils'):null};
+    renderMeta();document.getElementById('optionsDlg').close();
+    if(checkoutIntent){checkoutIntent=false;finishCheckout()}
+  };
+}
+const optionsCancel=document.getElementById('optionsCancel');
+if(optionsCancel)optionsCancel.addEventListener('click',()=>{checkoutIntent=false});
 
 window.renderHistory=()=>{
   normalizeOrderNumbers();document.getElementById('statCount').textContent=records.length;document.getElementById('statRevenue').textContent='$'+records.reduce((s,r)=>s+Number(r.amount||0),0);const list=document.getElementById('historyList');list.innerHTML='';if(!records.length){list.innerHTML='<div class="empty">尚無結帳紀錄</div>';return}
