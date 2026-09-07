@@ -24,7 +24,7 @@ button:disabled{opacity:.45;cursor:not-allowed}
 .orderMeta{padding:10px 12px;background:#fff8db;border-bottom:1px solid #eadb9e;font-size:14px;line-height:1.55}
 .cart{flex:1;padding:8px 12px;overflow:auto}.empty{text-align:center;color:#888;padding:28px 8px}
 .bowlBlock{border:1px solid #ddd;border-radius:12px;padding:10px;margin:10px 0;background:#fff}.bowlBlock.active{border-color:#111;box-shadow:0 0 0 2px #1111}.bowlBlockHead{display:flex;justify-content:space-between;gap:8px;align-items:flex-start;font-weight:900}.bowlSub{font-size:13px;color:#555;margin-top:4px}.row{display:grid;grid-template-columns:1fr auto;gap:10px;border-bottom:1px solid #eee;padding:8px 0}.row:last-child{border-bottom:0}.rowName{font-weight:900}.qty{display:flex;gap:7px;align-items:center;margin-top:6px}.qty button{width:31px;height:31px;padding:0;background:#eee}.sum{font-weight:900}
-.summary{padding:12px;border-top:1px solid #ddd}.total{display:flex;justify-content:space-between;font-size:26px;font-weight:950;margin-bottom:9px}.actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+.summary{padding:12px;border-top:1px solid #ddd;background:#fff;position:sticky;bottom:0;z-index:4}.bowlActions{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-bottom:10px}.bowlActions button{padding:11px 6px;font-size:14px;min-height:44px}.total{display:flex;justify-content:space-between;font-size:26px;font-weight:950;margin-bottom:9px}.actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
 dialog{border:0;border-radius:16px;width:min(96vw,720px);max-height:92vh;padding:0;box-shadow:0 20px 70px #0006}dialog::backdrop{background:#0008}.modal{padding:16px}.modal h2{margin:0 0 12px}.section{margin:13px 0}.sectionTitle{font-weight:900;margin-bottom:7px}
 .optionGrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.optionGrid.spiceGrid{grid-template-columns:repeat(4,minmax(0,1fr))}
 .optionGrid label{position:relative;display:flex;align-items:center;justify-content:center;text-align:center;min-height:52px;border:1.5px solid #bbb;border-radius:10px;background:#fff;font-weight:900;padding:8px;cursor:pointer;user-select:none}.optionGrid label:has(input:checked){background:#111;color:#fff;border-color:#111}.optionGrid input{position:absolute;opacity:0;pointer-events:none}
@@ -46,11 +46,6 @@ dialog{border:0;border-radius:16px;width:min(96vw,720px);max-height:92vh;padding
   <main class="left">
     <div class="toolRow" id="serviceRow"><b style="align-self:center">整單用餐：</b><button id="serviceInBtn" class="ghost">內用</button><button id="serviceOutBtn" class="ghost">外帶</button></div>
     <div class="bowlTabs" id="bowlTabs"></div>
-    <div class="toolRow">
-      <button id="addBowlBtn" class="green">＋ 新增一碗</button>
-      <button id="setOptionsBtn" class="ghost">設定本碗選項</button>
-      <button id="removeBowlBtn" class="ghost">刪除本碗</button>
-    </div>
     <div class="categories" id="cats"></div>
     <div class="grid" id="grid"></div>
   </main>
@@ -59,6 +54,11 @@ dialog{border:0;border-radius:16px;width:min(96vw,720px);max-height:92vh;padding
     <div id="orderMeta" class="orderMeta">可先點第一碗食材 → 設定辣度/需求 → 再新增下一碗</div>
     <div class="cart" id="cart"></div>
     <div class="summary">
+      <div class="bowlActions">
+        <button id="addBowlBtn" class="green">＋ 新增一碗</button>
+        <button id="setOptionsBtn" class="ghost">設定本碗</button>
+        <button id="removeBowlBtn" class="ghost">刪除本碗</button>
+      </div>
       <div class="total"><span>總計</span><span id="total">$0</span></div>
       <div class="actions"><button id="clear" class="ghost">清空整單</button><button id="checkout" class="dark">結帳</button></div>
     </div>
@@ -108,10 +108,10 @@ const DEFAULT_ITEMS=[
 ['麵類','韓國拉麵',45],['麵類','手工拉麵',40],['麵類','刀削麵',25],['麵類','蔬菜麵',25],['麵類','粿仔條',25],['麵類','蒸煮麵',25],['麵類','意Q麵',25],['麵類','雞絲麵',25],['麵類','鍋燒意麵',25],['麵類','王子麵',20],['麵類','冬粉',20],['麵類','寬冬粉',20],['麵類','烏龍麵',20],
 ['套餐','牛肉套餐',210],['套餐','豬肉套餐',210],['套餐','雞肉套餐',210],['套餐','鴨血套餐',150],['套餐','豆腐煲套餐',150]
 ];
-function safeJson(key,fallback){try{const raw=localStorage.getItem(key);if(!raw)return fallback;const v=JSON.parse(raw);return v}catch(e){return fallback}}
-let items=safeJson('posItems',null);if(!Array.isArray(items)||!items.length||!items.every(x=>Array.isArray(x)&&x.length>=3)){items=structuredClone(DEFAULT_ITEMS);localStorage.setItem('posItems',JSON.stringify(items))}
-let records=safeJson('posRecords',[]);if(!Array.isArray(records))records=[];
-let activeCat='全部';let currentBowlIndex=0;let bowls=[newEmptyBowl()];let checkoutIntent=false;let orderService='';
+let storedItems=null;try{storedItems=JSON.parse(localStorage.getItem('posItems')||'null')}catch(e){}
+let items=(Array.isArray(storedItems)&&storedItems.length)?storedItems:structuredClone(DEFAULT_ITEMS);if(!Array.isArray(storedItems)||!storedItems.length)localStorage.setItem('posItems',JSON.stringify(items));
+let records=[];try{const r=JSON.parse(localStorage.getItem('posRecords')||'[]');records=Array.isArray(r)?r:[]}catch(e){records=[]}
+let activeCat='全部',currentBowlIndex=0,bowls=[newEmptyBowl()],orderService='';
 function newEmptyBowl(){return{items:{},spice:'',extras:[]}}
 function saveRecords(){localStorage.setItem('posRecords',JSON.stringify(records))}
 function saveItems(){localStorage.setItem('posItems',JSON.stringify(items))}
@@ -123,91 +123,39 @@ function bowlTotal(b){return Object.entries(b.items).reduce((s,[i,q])=>s+Number(
 function orderTotal(){return bowls.reduce((s,b)=>s+bowlTotal(b),0)}
 function bowlCount(b){return Object.values(b.items).reduce((s,q)=>s+Number(q),0)}
 function validBowls(){return bowls.filter(b=>bowlCount(b)>0)}
-function formatOptions(b){const parts=[b.spice,...(b.extras||[])].filter(Boolean);return parts.length?'● '+parts.join('、'):''}
-function cartTextFromBowl(b){return Object.entries(b.items).filter(([,q])=>q>0).map(([i,q])=>`${items[i][1]}×${q}`).join('、')}
 function esc(s){return String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
-function normalizeOrderNumbers(){const groups={};records.forEach(r=>{const k=dayKey(r.time);(groups[k]??=[]).push(r)});let changed=false;Object.values(groups).forEach(rs=>{rs.sort((a,b)=>new Date(a.time)-new Date(b.time));rs.forEach((r,i)=>{const no=i+1;if(Number(r.orderNo)!==no){r.orderNo=no;changed=true}})});if(changed)saveRecords()}
-function nextOrderNo(){normalizeOrderNumbers();const today=dayKey(new Date());return records.filter(r=>dayKey(r.time)===today).length+1}
+function formatOptions(b){const p=[b.spice,...(b.extras||[])].filter(Boolean);return p.length?'● '+p.join('、'):''}
+function cartTextFromBowl(b){return Object.entries(b.items).filter(([,q])=>q>0).map(([i,q])=>`${items[i][1]}×${q}`).join('、')}
+function normalizeOrderNumbers(){const groups={};records.forEach(r=>{const k=dayKey(r.time);(groups[k]??=[]).push(r)});let changed=false;Object.values(groups).forEach(rs=>{rs.sort((a,b)=>new Date(a.time)-new Date(b.time));rs.forEach((r,i)=>{if(Number(r.orderNo)!==i+1){r.orderNo=i+1;changed=true}})});if(changed)saveRecords()}
+function nextOrderNo(){normalizeOrderNumbers();return records.filter(r=>dayKey(r.time)===dayKey(new Date())).length+1}
 function renderCats(){const wrap=document.getElementById('cats');wrap.innerHTML='';categories().forEach(cat=>{const b=document.createElement('button');b.textContent=cat;b.className=cat===activeCat?'active':'';b.onclick=()=>{activeCat=cat;renderCats();renderGrid()};wrap.appendChild(b)});const sel=document.getElementById('newCat');sel.innerHTML='';categories().filter(c=>c!=='全部').forEach(c=>{const o=document.createElement('option');o.value=o.textContent=c;sel.appendChild(o)})}
-function renderGrid(){const grid=document.getElementById('grid');grid.innerHTML='';items.filter(x=>activeCat==='全部'||x[0]===activeCat).forEach(it=>{const idx=items.indexOf(it);const b=document.createElement('button');b.className='item';b.innerHTML=`<span class="itemName">${esc(it[1])}</span><span class="price">$${it[2]}</span>`;b.onclick=()=>addItem(idx);grid.appendChild(b)})}
-function renderBowlTabs(){const wrap=document.getElementById('bowlTabs');wrap.innerHTML='';bowls.forEach((b,i)=>{const btn=document.createElement('button');btn.className=i===currentBowlIndex?'active':'';btn.textContent=`第 ${i+1} 碗${bowlCount(b)?' ('+bowlCount(b)+')':''}`;btn.onclick=()=>{currentBowlIndex=i;renderBowlTabs();renderCart()};wrap.appendChild(btn)})}
-function renderService(){document.getElementById('serviceInBtn').className=orderService==='內用'?'dark':'ghost';document.getElementById('serviceOutBtn').className=orderService==='外帶'?'dark':'ghost'}
-function addItem(idx){const bowl=bowls[currentBowlIndex];bowl.items[idx]=(bowl.items[idx]||0)+1;renderCart();renderBowlTabs()}
-function changeItem(bowlIndex,itemIndex,delta){const bowl=bowls[bowlIndex];bowl.items[itemIndex]=(bowl.items[itemIndex]||0)+delta;if(bowl.items[itemIndex]<=0)delete bowl.items[itemIndex];renderCart();renderBowlTabs()}
-function renderMeta(){const filled=validBowls();if(!filled.length){document.getElementById('orderMeta').textContent='可先點第一碗食材 → 設定辣度/需求 → 再新增下一碗';return}document.getElementById('orderMeta').innerHTML=`<b>${orderService||'尚未選內用/外帶'}</b><br>`+filled.map((b,i)=>esc([`第${i+1}碗`,b.spice||'未選辣度',...(b.extras||[])].filter(Boolean).join('・'))).join('<br>')}
-function renderCart(){renderService();const cart=document.getElementById('cart');cart.innerHTML='';const filled=validBowls();if(!filled.length){cart.innerHTML='<div class="empty">點左邊商品加入目前這一碗</div>'}filled.forEach((b,displayIndex)=>{const realIndex=bowls.indexOf(b);const block=document.createElement('div');block.className='bowlBlock'+(realIndex===currentBowlIndex?' active':'');const opts=formatOptions(b);block.innerHTML=`<div class="bowlBlockHead"><div><div>第 ${displayIndex+1} 碗 ${realIndex===currentBowlIndex?'<span style="font-size:12px;color:#666">（目前編輯）</span>':''}</div><div class="bowlSub">${esc(b.spice||'未選辣度')}${opts?'<br>'+esc(opts):''}</div></div><div>$${bowlTotal(b)}</div></div>`;block.onclick=()=>{currentBowlIndex=realIndex;renderBowlTabs();renderCart()};Object.entries(b.items).filter(([,q])=>q>0).forEach(([itemIdx,q])=>{const row=document.createElement('div');row.className='row';row.innerHTML=`<div><div class="rowName">${esc(items[itemIdx][1])}　$${items[itemIdx][2]}</div><div class="qty"><button>−</button><b>${q}</b><button>＋</button></div></div><div class="sum">$${items[itemIdx][2]*q}</div>`;const btns=row.querySelectorAll('button');btns[0].onclick=(e)=>{e.stopPropagation();changeItem(realIndex,itemIdx,-1)};btns[1].onclick=(e)=>{e.stopPropagation();changeItem(realIndex,itemIdx,1)};block.appendChild(row)});const rowBtns=document.createElement('div');rowBtns.style.cssText='display:flex;gap:8px;margin-top:8px;flex-wrap:wrap';rowBtns.innerHTML='<button class="ghost">設定本碗</button>';rowBtns.querySelector('button').onclick=(e)=>{e.stopPropagation();currentBowlIndex=realIndex;openOptions()};block.appendChild(rowBtns);cart.appendChild(block)});document.getElementById('total').textContent='$'+orderTotal();renderMeta();document.getElementById('removeBowlBtn').disabled=bowls.length<=1}
-const spiceBox=document.getElementById('spiceChoices');SPICES.forEach(s=>{const l=document.createElement('label');l.innerHTML=`<input type="radio" name="spice" value="${s}">${s}`;spiceBox.appendChild(l)});const quickBox=document.getElementById('quickChoices');QUICK_OPTIONS.forEach(v=>{const l=document.createElement('label');l.innerHTML=`<input type="checkbox" name="quick" value="${v}">${v}`;quickBox.appendChild(l)});quickBox.addEventListener('change',e=>{const t=e.target;if(!t.matches('input[type="checkbox"]')||!t.checked)return;(CONFLICTS[t.value]||[]).forEach(v=>{const q=quickBox.querySelector(`input[value="${v}"]`);if(q)q.checked=false})});
-function pick(name){const e=document.querySelector(`input[name="${name}"]:checked`);return e?e.value:''}
-function picks(name){return [...document.querySelectorAll(`input[name="${name}"]:checked`)].map(x=>x.value)}
-function openOptions(){const bowl=bowls[currentBowlIndex];document.querySelectorAll('input[name="spice"],input[name="quick"]').forEach(x=>x.checked=false);if(bowl.spice){const s=document.querySelector(`input[name="spice"][value="${bowl.spice}"]`);if(s)s.checked=true}(bowl.extras||[]).forEach(v=>{const q=document.querySelector(`input[name="quick"][value="${v}"]`);if(q)q.checked=true});document.querySelector('#optionsDlg h2').textContent=`第 ${currentBowlIndex+1} 碗選項`;document.getElementById('optionsSave').textContent=checkoutIntent?'儲存並結帳':'儲存本碗';document.getElementById('optionsDlg').showModal()}
-function saveCurrentBowlOptions(){const bowl=bowls[currentBowlIndex];const spice=pick('spice');if(!spice){alert('請選擇辣度');return false}bowl.spice=spice;bowl.extras=picks('quick');renderCart();document.getElementById('optionsDlg').close();return true}
-function addBowl(){if(bowlCount(bowls[currentBowlIndex])===0){alert('請先點目前這一碗的食材');return}bowls.push(newEmptyBowl());currentBowlIndex=bowls.length-1;renderBowlTabs();renderCart()}
-function removeCurrentBowl(){if(bowls.length<=1)return;if(!confirm(`要刪除第 ${currentBowlIndex+1} 碗嗎？`))return;bowls.splice(currentBowlIndex,1);if(currentBowlIndex>=bowls.length)currentBowlIndex=bowls.length-1;renderBowlTabs();renderCart()}
-function clearOrder(){if(!confirm('要清空整張訂單嗎？'))return;bowls=[newEmptyBowl()];currentBowlIndex=0;orderService='';checkoutIntent=false;renderBowlTabs();renderCart()}
-function ensureAllBowlsReady(){const filled=validBowls();if(!filled.length){alert('目前沒有商品');return false}if(!orderService){alert('請先在主畫面上方選擇整張單是內用或外帶');return false}for(let i=0;i<filled.length;i++){const b=filled[i];if(!b.spice){currentBowlIndex=bowls.indexOf(b);renderBowlTabs();renderCart();alert(`第 ${i+1} 碗尚未設定辣度`);openOptions();return false}}return true}
+function renderGrid(){const g=document.getElementById('grid');g.innerHTML='';items.forEach((it,idx)=>{if(activeCat!=='全部'&&it[0]!==activeCat)return;const b=document.createElement('button');b.className='item';b.innerHTML=`<span class="itemName">${esc(it[1])}</span><span class="price">$${it[2]}</span>`;b.onclick=()=>{const bowl=bowls[currentBowlIndex];bowl.items[idx]=(bowl.items[idx]||0)+1;renderAll()};g.appendChild(b)})}
+function renderBowlTabs(){const w=document.getElementById('bowlTabs');w.innerHTML='';bowls.forEach((b,i)=>{const x=document.createElement('button');x.className=i===currentBowlIndex?'active':'';x.textContent=`第 ${i+1} 碗${bowlCount(b)?' ('+bowlCount(b)+')':''}`;x.onclick=()=>{currentBowlIndex=i;renderAll()};w.appendChild(x)})}
+function renderService(){serviceInBtn.className=orderService==='內用'?'dark':'ghost';serviceOutBtn.className=orderService==='外帶'?'dark':'ghost'}
+function renderMeta(){const f=validBowls();orderMeta.innerHTML=`整單：${orderService||'未選內用/外帶'}`+(f.length?'<br>'+f.map((b,i)=>`第${i+1}碗・${b.spice||'未選辣度'}${b.extras?.length?'・'+b.extras.join('・'):''}`).join('<br>'):'')}
+function renderCart(){cart.innerHTML='';const f=validBowls();if(!f.length)cart.innerHTML='<div class="empty">點左邊商品加入目前這一碗</div>';f.forEach((b,di)=>{const ri=bowls.indexOf(b),block=document.createElement('div');block.className='bowlBlock'+(ri===currentBowlIndex?' active':'');block.onclick=()=>{currentBowlIndex=ri;renderAll()};block.innerHTML=`<div class="bowlBlockHead"><div>第 ${di+1} 碗<div class="bowlSub">${esc(formatOptions(b)||'未設定辣度')}</div></div><div>$${bowlTotal(b)}</div></div>`;Object.entries(b.items).forEach(([ii,q])=>{const r=document.createElement('div');r.className='row';r.innerHTML=`<div><div class="rowName">${esc(items[ii][1])}　$${items[ii][2]}</div><div class="qty"><button data-m>−</button><b>${q}</b><button data-p>＋</button></div></div><div class="sum">$${items[ii][2]*q}</div>`;r.querySelector('[data-m]').onclick=e=>{e.stopPropagation();b.items[ii]--;if(b.items[ii]<=0)delete b.items[ii];renderAll()};r.querySelector('[data-p]').onclick=e=>{e.stopPropagation();b.items[ii]++;renderAll()};block.appendChild(r)});cart.appendChild(block)});total.textContent='$'+orderTotal();removeBowlBtn.disabled=bowls.length<=1}
+function renderAll(){renderBowlTabs();renderService();renderCart();renderMeta()}
+const spiceBox=document.getElementById('spiceChoices');SPICES.forEach(s=>{const l=document.createElement('label');l.innerHTML=`<input type="radio" name="spice" value="${s}">${s}`;spiceBox.appendChild(l)});
+const quickBox=document.getElementById('quickChoices');QUICK_OPTIONS.forEach(v=>{const l=document.createElement('label');l.innerHTML=`<input type="checkbox" name="quick" value="${v}">${v}`;quickBox.appendChild(l)});quickBox.onchange=e=>{const t=e.target;if(t.checked)(CONFLICTS[t.value]||[]).forEach(v=>{const q=quickBox.querySelector(`input[value="${v}"]`);if(q)q.checked=false})};
+function openOptions(){const b=bowls[currentBowlIndex];document.querySelectorAll('input[name="spice"],input[name="quick"]').forEach(x=>x.checked=false);if(b.spice){const s=document.querySelector(`input[name="spice"][value="${b.spice}"]`);if(s)s.checked=true}(b.extras||[]).forEach(v=>{const q=document.querySelector(`input[name="quick"][value="${v}"]`);if(q)q.checked=true});optionsDlg.querySelector('h2').textContent=`第 ${currentBowlIndex+1} 碗選項`;optionsDlg.showModal()}
+function saveCurrentBowlOptions(){const s=document.querySelector('input[name="spice"]:checked');if(!s){alert('請選擇辣度');return}const b=bowls[currentBowlIndex];b.spice=s.value;b.extras=[...document.querySelectorAll('input[name="quick"]:checked')].map(x=>x.value);optionsDlg.close();renderAll()}
 function linesFromBowl(b){return Object.entries(b.items).filter(([,q])=>q>0).map(([i,q])=>({name:items[i][1],qty:Number(q),price:Number(items[i][2]),subtotal:Number(items[i][2])*Number(q)}))}
+function ensureReady(){const f=validBowls();if(!f.length){alert('目前沒有商品');return false}if(!orderService){alert('請先選擇內用或外帶');return false}for(let i=0;i<f.length;i++)if(!f[i].spice){currentBowlIndex=bowls.indexOf(f[i]);renderAll();alert(`第 ${i+1} 碗尚未設定辣度`);openOptions();return false}return true}
 function printReceipt(rec){
-  const no=String(rec.orderNo||0).padStart(3,'0');
-  const dt=new Date(rec.time),date=dt.toLocaleDateString('zh-TW'),time=dt.toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit',hour12:false});
-  const groups=(rec.bowls||[]).map((b,idx)=>{
-    const rows=(b.lines||[]).map(x=>`<div class="item"><span>${esc(x.name)}</span><span class="qty">${x.qty}</span><span class="money">${x.subtotal}</span></div>`).join('');
-    const note=[b.spice,...(b.extras||[])].filter(Boolean).join('、');
-    return `<div class="group">${rows}${note?`<div class="note">● ${esc(note)}</div>`:''}</div>`;
-  }).join('<div class="gap"></div>');
-  const serviceLabel=rec.service||(rec.bowls&&rec.bowls[0]&&rec.bowls[0].service)||'訂單';
-  const w=window.open('','_blank','width=430,height=820');if(!w){alert('請允許此網站開啟彈出式視窗，才能列印出單。');return}
-  w.document.write(`<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${STORE_NAME} ${no}</title><style>@page{size:80mm auto;margin:2.5mm}*{box-sizing:border-box}html,body{margin:0;padding:0;background:#fff;color:#000;font-family:-apple-system,BlinkMacSystemFont,"Noto Sans TC",sans-serif}.r{width:75mm;margin:0 auto;font-size:14px;line-height:1.35}.shop{text-align:center;font-size:18px;font-weight:900}.ord{text-align:left;font-size:20px;font-weight:900;margin:2mm 0}.dt{display:flex;justify-content:space-between;font-size:12px;margin:1mm 0}.sub{font-size:12px;margin-bottom:1mm}.dash{border-top:1px dashed #000;margin:2mm 0}.head,.item{display:grid;grid-template-columns:1fr 9mm 16mm;gap:1mm}.head{font-weight:900;font-size:12px}.item{padding:1mm 0}.qty{text-align:center}.money{text-align:right;white-space:nowrap}.note{font-size:13px;font-weight:700;padding:1.2mm 0 1.8mm 0;word-break:break-all}.gap{border-top:1px dotted #999;margin:1.5mm 0}.totalRow{display:grid;grid-template-columns:1fr 10mm 24mm;gap:1mm;align-items:end;white-space:nowrap}.totalLabel{font-size:24px;font-weight:900}.totalQty{font-size:22px;font-weight:900;text-align:center}.totalAmt{font-size:24px;font-weight:900;text-align:right;white-space:nowrap}.foot{text-align:center;font-size:11px;margin-top:4mm}</style></head><body><div class="r"><div class="shop">${STORE_NAME}</div><div class="ord">${serviceLabel}單號：${no}</div><div class="dt"><span>日期：${date}</span><span>時間：${time}</span></div><div class="sub">交易序號：${dayKey(rec.time).replaceAll('-','')}${no}</div><div class="dash"></div><div class="head"><span>商品名稱</span><span style="text-align:center">數量</span><span style="text-align:right">金額</span></div><div class="dash"></div>${groups}<div class="dash"></div><div class="totalRow"><span class="totalLabel">總計：</span><span class="totalQty">${rec.itemCount}</span><span class="totalAmt">${rec.amount}元</span></div><div class="foot">請依單號取餐・謝謝光臨</div></div><script>window.onload=()=>setTimeout(()=>window.print(),250)<\/script></body></html>`);
-  w.document.close();
+  const no=String(rec.orderNo||0).padStart(3,'0'),dt=new Date(rec.time),date=dt.toLocaleDateString('zh-TW'),time=dt.toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit',hour12:false});
+  const groups=(rec.bowls||[]).map(b=>{const rows=(b.lines||[]).map(x=>`<div class="item"><span>${esc(x.name)}</span><span class="qty">${x.qty}</span><span class="money">${x.subtotal}</span></div>`).join('');const note=[b.spice,...(b.extras||[])].filter(Boolean).join('、');return `<div>${rows}${note?`<div class="note">● ${esc(note)}</div>`:''}</div>`}).join('<div class="gap"></div>');
+  const w=window.open('','_blank','width=430,height=820');if(!w){alert('請允許彈出式視窗才能列印');return}
+  w.document.write(`<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${STORE_NAME} ${no}</title><style>@page{size:80mm auto;margin:2.5mm}*{box-sizing:border-box}html,body{margin:0;padding:0;background:#fff;color:#000;font-family:-apple-system,BlinkMacSystemFont,"Noto Sans TC",sans-serif}.r{width:75mm;margin:0 auto;font-size:14px;line-height:1.35}.shop{text-align:center;font-size:18px;font-weight:900}.ord{text-align:left;font-size:20px;font-weight:900;margin:2mm 0}.dt{display:flex;justify-content:space-between;font-size:12px;margin:1mm 0}.sub{font-size:12px;margin-bottom:1mm}.dash{border-top:1px dashed #000;margin:2mm 0}.head,.item{display:grid;grid-template-columns:1fr 9mm 16mm;gap:1mm}.head{font-weight:900;font-size:12px}.item{padding:1mm 0}.qty{text-align:center}.money{text-align:right;white-space:nowrap}.note{font-size:13px;font-weight:700;padding:1.2mm 0 1.8mm 0;word-break:break-all}.gap{border-top:1px dotted #999;margin:1.5mm 0}.totalRow{display:grid;grid-template-columns:1fr 10mm 24mm;gap:1mm;align-items:end;white-space:nowrap}.totalLabel{font-size:24px;font-weight:900}.totalQty{font-size:22px;font-weight:900;text-align:center}.totalAmt{font-size:24px;font-weight:900;text-align:right;white-space:nowrap}.foot{text-align:center;font-size:11px;margin-top:4mm}</style></head><body><div class="r"><div class="shop">${STORE_NAME}</div><div class="ord">${rec.service}單號：${no}</div><div class="dt"><span>日期：${date}</span><span>時間：${time}</span></div><div class="sub">交易序號：${dayKey(rec.time).replaceAll('-','')}${no}</div><div class="dash"></div><div class="head"><span>商品名稱</span><span style="text-align:center">數量</span><span style="text-align:right">金額</span></div><div class="dash"></div>${groups}<div class="dash"></div><div class="totalRow"><span class="totalLabel">總計：</span><span class="totalQty">${rec.itemCount}</span><span class="totalAmt">${rec.amount}元</span></div><div class="foot">請依單號取餐・謝謝光臨</div></div><script>window.onload=()=>setTimeout(()=>window.print(),250)<\/script></body></html>`);w.document.close()
 }
-function finishCheckout(){if(!ensureAllBowlsReady())return false;const t=orderTotal();const filled=validBowls();const rec={id:Date.now(),orderNo:nextOrderNo(),time:new Date().toISOString(),amount:t,itemCount:filled.reduce((s,b)=>s+bowlCount(b),0),service:orderService,bowls:filled.map(b=>({spice:b.spice,extras:[...(b.extras||[])],items:cartTextFromBowl(b),lines:linesFromBowl(b)}))};records.unshift(rec);saveRecords();printReceipt(rec);bowls=[newEmptyBowl()];currentBowlIndex=0;orderService='';checkoutIntent=false;renderBowlTabs();renderCart();return true}
-function renderHistory(){
-  normalizeOrderNumbers();
-  document.getElementById('statCount').textContent=records.length;
-  document.getElementById('statRevenue').textContent='$'+records.reduce((sum,r)=>sum+Number(r.amount||0),0);
-  const list=document.getElementById('historyList');list.innerHTML='';
-  if(!records.length){list.innerHTML='<div class="empty">尚無結帳紀錄</div>';return}
-  const groups={};records.forEach(r=>{const k=dayKey(r.time);(groups[k]??=[]).push(r)});
-  Object.keys(groups).sort().reverse().forEach(k=>{
-    const rs=groups[k].sort((a,b)=>new Date(b.time)-new Date(a.time));
-    const dailyTotal=rs.reduce((sum,r)=>sum+Number(r.amount||0),0);
-    const section=document.createElement('section');section.style.cssText='margin:14px 0 18px';
-    section.innerHTML=`<div style="display:flex;justify-content:space-between;align-items:end;border-bottom:2px solid #111;padding:7px 2px;font-weight:900"><span>${dayLabel(k)}</span><span>${rs.length} 筆・$${dailyTotal}</span></div>`;
-    rs.forEach(r=>{
-      const bowlsData=Array.isArray(r.bowls)?r.bowls:[];
-      const service=r.service||(bowlsData[0]&&bowlsData[0].service)||'';
-      const detail=bowlsData.map((b,i)=>{
-        const lines=Array.isArray(b.lines)&&b.lines.length?b.lines:[];
-        const itemLines=lines.length
-          ? lines.map(x=>`　${x.name} ×${x.qty}　$${x.subtotal!=null?x.subtotal:''}`).join('\n')
-          : `　${b.items||''}`;
-        return `第${i+1}碗\n${itemLines}${formatRecordNote(b)?'\n'+formatRecordNote(b):''}`;
-      }).join('\n\n');
-      const d=document.createElement('div');d.className='record';
-      d.innerHTML=`<div class="recordHead"><span>#${String(r.orderNo||0).padStart(3,'0')}　${esc(service)}・${bowlsData.length||1} 碗</span><span>$${r.amount}</span></div><div class="recordMeta">${dayLabel(dayKey(r.time))} ${localTime(r.time)}・共 ${r.itemCount||0} 項</div><div class="recordItems">${esc(detail)}</div><div class="recordBtns"><button class="dark" data-print>重印</button><button class="ghost" data-del>刪除</button></div>`;
-      d.querySelector('[data-print]').onclick=()=>printReceipt(r);
-      d.querySelector('[data-del]').onclick=()=>{if(confirm('確定刪除這筆結帳紀錄？')){records=records.filter(x=>x.id!==r.id);normalizeOrderNumbers();saveRecords();renderHistory()}};
-      section.appendChild(d);
-    });
-    list.appendChild(section);
-  });
-}
-function formatRecordNote(b){const p=[b.spice,...(b.extras||[])].filter(Boolean);return p.length?'● '+p.join('、'):''}
-
-document.getElementById('serviceInBtn').onclick=()=>{orderService='內用';renderService();renderMeta()};document.getElementById('serviceOutBtn').onclick=()=>{orderService='外帶';renderService();renderMeta()};
-renderCats();renderGrid();renderBowlTabs();renderCart();
-document.getElementById('addBowlBtn').onclick=addBowl;
-document.getElementById('removeBowlBtn').onclick=removeCurrentBowl;
-document.getElementById('setOptionsBtn').onclick=()=>{if(bowlCount(bowls[currentBowlIndex])===0){alert('這一碗還沒有商品');return}openOptions()};
-document.getElementById('clear').onclick=clearOrder;
-document.getElementById('checkout').onclick=()=>{if(!validBowls().length){alert('目前沒有商品');return}finishCheckout()};
-document.getElementById('historyBtn').onclick=()=>{renderHistory();document.getElementById('historyDlg').showModal()};
-document.getElementById('historyClose').onclick=()=>document.getElementById('historyDlg').close();
-document.getElementById('optionsCancel').onclick=()=>{checkoutIntent=false;document.getElementById('optionsDlg').close()};
-document.getElementById('optionsSave').onclick=saveCurrentBowlOptions;
-document.getElementById('customBtn').onclick=()=>document.getElementById('customDlg').showModal();
-document.getElementById('customCancel').onclick=()=>document.getElementById('customDlg').close();
-document.getElementById('customSave').onclick=()=>{const cat=document.getElementById('newCat').value;const name=document.getElementById('newName').value.trim();const price=Number(document.getElementById('newPrice').value);if(!name||!Number.isFinite(price)||price<0){alert('請輸入品名與正確價格');return}items.push([cat,name,price]);saveItems();document.getElementById('newName').value='';document.getElementById('newPrice').value='';renderCats();renderGrid();document.getElementById('customDlg').close()};
-
+function finishCheckout(){if(!ensureReady())return;const f=validBowls();const rec={id:Date.now(),orderNo:nextOrderNo(),time:new Date().toISOString(),amount:orderTotal(),itemCount:f.reduce((s,b)=>s+bowlCount(b),0),service:orderService,bowls:f.map(b=>({spice:b.spice,extras:[...(b.extras||[])],items:cartTextFromBowl(b),lines:linesFromBowl(b)}))};records.unshift(rec);saveRecords();printReceipt(rec);bowls=[newEmptyBowl()];currentBowlIndex=0;orderService='';renderAll()}
+function renderHistory(){normalizeOrderNumbers();statCount.textContent=records.length;statRevenue.textContent='$'+records.reduce((s,r)=>s+Number(r.amount||0),0);historyList.innerHTML='';const groups={};records.forEach(r=>{const k=dayKey(r.time);(groups[k]??=[]).push(r)});Object.keys(groups).sort().reverse().forEach(k=>{const rs=groups[k].sort((a,b)=>new Date(b.time)-new Date(a.time));const sec=document.createElement('section');sec.innerHTML=`<div style="display:flex;justify-content:space-between;font-weight:900;border-bottom:2px solid #111;padding:8px 2px"><span>${dayLabel(k)}</span><span>${rs.length} 筆・$${rs.reduce((s,r)=>s+Number(r.amount||0),0)}</span></div>`;rs.forEach(r=>{const details=(r.bowls||[]).map((b,i)=>`第 ${i+1} 碗\n${(b.lines||[]).map(x=>`${x.name} ×${x.qty}　$${x.subtotal}`).join('\n')}\n${[b.spice,...(b.extras||[])].filter(Boolean).join('、')}`).join('\n\n');const d=document.createElement('div');d.className='record';d.innerHTML=`<div class="recordHead"><span>#${String(r.orderNo||0).padStart(3,'0')}　${esc(r.service||'')}　${r.bowls?.length||1}碗</span><span>$${r.amount}</span></div><div class="recordMeta">${dayLabel(dayKey(r.time))} ${localTime(r.time)}・${r.itemCount} 項</div><div class="recordItems">${esc(details)}</div><div class="recordBtns"><button class="dark">重印</button><button class="ghost">刪除</button></div>`;const bs=d.querySelectorAll('button');bs[0].onclick=()=>printReceipt(r);bs[1].onclick=()=>{if(confirm('確定刪除此紀錄？')){records=records.filter(x=>x.id!==r.id);saveRecords();renderHistory()}};sec.appendChild(d)});historyList.appendChild(sec)})}
+serviceInBtn.onclick=()=>{orderService='內用';renderAll()};serviceOutBtn.onclick=()=>{orderService='外帶';renderAll()};
+addBowlBtn.onclick=()=>{if(!bowlCount(bowls[currentBowlIndex])){alert('請先點目前這一碗的食材');return}bowls.push(newEmptyBowl());currentBowlIndex=bowls.length-1;renderAll()};
+setOptionsBtn.onclick=()=>{if(!bowlCount(bowls[currentBowlIndex])){alert('這一碗還沒有商品');return}openOptions()};removeBowlBtn.onclick=()=>{if(bowls.length<=1)return;if(confirm(`要刪除第 ${currentBowlIndex+1} 碗嗎？`)){bowls.splice(currentBowlIndex,1);currentBowlIndex=Math.max(0,Math.min(currentBowlIndex,bowls.length-1));renderAll()}};
+clear.onclick=()=>{if(confirm('要清空整張訂單嗎？')){bowls=[newEmptyBowl()];currentBowlIndex=0;orderService='';renderAll()}};checkout.onclick=finishCheckout;
+historyBtn.onclick=()=>{renderHistory();historyDlg.showModal()};historyClose.onclick=()=>historyDlg.close();optionsCancel.onclick=()=>optionsDlg.close();optionsSave.onclick=saveCurrentBowlOptions;
+customBtn.onclick=()=>customDlg.showModal();customCancel.onclick=()=>customDlg.close();customSave.onclick=()=>{const cat=newCat.value,name=newName.value.trim(),price=Number(newPrice.value);if(!name||!Number.isFinite(price)||price<0){alert('請輸入正確品名與價格');return}items.push([cat,name,price]);saveItems();newName.value='';newPrice.value='';renderCats();renderGrid();customDlg.close()};
+renderCats();renderGrid();renderAll();
 </script>
 </body>
 </html>
