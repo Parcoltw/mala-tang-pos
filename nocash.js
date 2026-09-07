@@ -1,0 +1,1 @@
+(()=>{const cashLine=document.querySelector('.cashline');if(cashLine)cashLine.remove();const change=document.getElementById('change');if(change)change.remove();})();
