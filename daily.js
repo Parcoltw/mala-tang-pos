@@ -5,6 +5,7 @@ const dayKey=(value)=>{
 };
 const dayLabel=(key)=>key.replaceAll('-','/');
 
+// 每天共用一組流水號：內用、外帶一起依結帳時間排序。
 function migrateOrderNumbers(){
   const groups={};
   [...records].sort((a,b)=>new Date(a.time)-new Date(b.time)).forEach(r=>{
@@ -13,20 +14,17 @@ function migrateOrderNumbers(){
   });
   let changed=false;
   Object.values(groups).forEach(rs=>{
-    const used=new Set(rs.map(r=>Number(r.orderNo)).filter(n=>Number.isInteger(n)&&n>0));
-    let next=1;
-    rs.forEach(r=>{
-      if(Number.isInteger(Number(r.orderNo))&&Number(r.orderNo)>0)return;
-      while(used.has(next))next++;
-      r.orderNo=next;used.add(next);next++;changed=true;
+    rs.sort((a,b)=>new Date(a.time)-new Date(b.time));
+    rs.forEach((r,i)=>{
+      const no=i+1;
+      if(Number(r.orderNo)!==no){r.orderNo=no;changed=true}
     });
   });
   if(changed)saveRecords();
 }
 function nextOrderNo(){
   const today=dayKey(new Date());
-  const nums=records.filter(r=>dayKey(r.time)===today).map(r=>Number(r.orderNo)||0);
-  return Math.max(0,...nums)+1;
+  return records.filter(r=>dayKey(r.time)===today).length+1;
 }
 
 migrateOrderNumbers();
@@ -68,7 +66,7 @@ window.renderHistory=()=>{
       const d=document.createElement('div');d.className='record';
       d.innerHTML=`<div class="recordHead"><span>#${String(r.orderNo||0).padStart(3,'0')}　${r.service}・${r.spice}</span><span>$${r.amount}</span></div><div class="recordMeta">${localTime(r.time)}${r.oil?'・'+r.oil:''}${r.bowl?'・'+r.bowl:''}${r.utensils?'・'+r.utensils:''}</div><div class="recordItems">${r.items||''}</div><div class="recordBtns"><button class="ghost" data-edit>修改</button><button class="ghost" data-del>刪除</button></div>`;
       d.querySelector('[data-edit]').onclick=()=>openEdit(r.id);
-      d.querySelector('[data-del]').onclick=()=>{if(confirm('確定刪除這筆結帳紀錄？')){records=records.filter(x=>x.id!==r.id);saveRecords();renderHistory()}};
+      d.querySelector('[data-del]').onclick=()=>{if(confirm('確定刪除這筆結帳紀錄？')){records=records.filter(x=>x.id!==r.id);saveRecords();migrateOrderNumbers();renderHistory()}};
       section.appendChild(d);
     });
     list.appendChild(section);
